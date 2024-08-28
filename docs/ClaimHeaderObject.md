@@ -34,4 +34,35 @@ Status Reason	Status_Reason__c	Text(255)		False
 Submitted On	SubmittedOn__c	Date		False	
 Total Applied to Deductible	Total_Applied_to_Deductible__c	Currency(18, 0)		False	
 Total Eligible	Total_Eligible__c	Currency(18, 0)		False	
-Total Paid	Total_Paid__c	Currency(18, 0)		
+Total Paid	Total_Paid__c	Currency(18, 0)
+
+## ACCOUNT OBJEXT
+
+These are all the fields and field types that are included as part of the account header object in my salesforce instance
+
+Field Label	SortField Name	SortData Type
+*Specialty	PXPAYER_Specialty__pc	Text(255)
+Account Name	Name	Name
+First Name	FirstName	Text(40)
+Last Name	LastName	Text(80)
+Account Owner	OwnerId	Lookup(User)
+Account Record Type	RecordTypeId	Record Type
+Account Number	AccountNumber	Text(40)
+Billing Address	BillingAddress	Address
+Primary Care Coordinator	PXPAY_Primary_Care_Coordinator__c	Lookup(User)
+Primary Caregiver	PXPAY_Primary_Caregiver__c	Lookup(Contact)
+Primary Contact	HealthCloudGA__PrimaryContact__c	Lookup(Contact)
+Phone	Phone	Phone
+Email	PersonEmail	Email
+Gender	HealthCloudGA__Gender__pc	Picklist
+Birthdate	PersonBirthdate	Date
+Member ID	PXPAYER_Member_ID__c	Text(255)
+Account Site	Site	Text(80)
+Care Plan	HealthCloudGA__CarePlan__c	Lookup(Case)
+Coverage Benefit	Coverage_Benefit__c	Lookup(Coverage Benefit)
+Medicare Enrollee	HealthCloudGA__MedicareEnrollee__c	Picklist
+Member Plan	Member_Plan__c	Lookup(Member Plan)
+Satisfaction	PXPAYER_Satisfaction__pc	Text(255)
+Risk Level	PXPAY_Risk_Level__c	Text(255)
+Pronouns	PersonPronouns	Picklist
+Primary Language	HealthCloudGA__PrimaryLanguage__pc	Picklist

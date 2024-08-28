@@ -1,42 +1,152 @@
 trigger SendToGPT on Claim_Header__c (before update) {
+    Set<Id> accountIds = new Set<Id>();
+
+    // Collect all Account IDs from the trigger context
     for (Claim_Header__c claim : Trigger.new) {
         Claim_Header__c oldClaim = Trigger.oldMap.get(claim.Id);
-
         if (claim.ChatGPT_Question__c != oldClaim.ChatGPT_Question__c) {
-            // Prepare the question with all the necessary data fields
-            String question = 'Account: ' + claim.Account__c + '\n' +
-                              'Adjudicated Amount: ' + claim.AdjudicatedAmount__c + '\n' +
-                              'Adjustment #: ' + claim.Adjustment_Number__c + '\n' +
-                              'Check #: ' + claim.Check_Number__c + '\n' +
-                              'Claim Amount: ' + claim.ClaimAmount__c + '\n' +
-                              'Claim Number: ' + claim.Name + '\n' +
-                              'Claim Status: ' + claim.ClaimStatus__c + '\n' +
-                              'Coinsurance - out of Network: ' + claim.Coinsurance_out_of_Network__c + '\n' +
-                              'Coinsurance - In Network: ' + claim.Coinsurnace_In_Network__c + '\n' +
-                              'Disposition Date: ' + claim.Disposition_Date__c + '\n' +
-                              'External ID: ' + claim.ClaimNumber__c + '\n' +
-                              'External Id: ' + claim.ExternalId__c + '\n' +
-                              'Fill Date: ' + claim.Fill_Date__c + '\n' +
-                              'Medicare: ' + claim.Medicare__c + '\n' +
-                              'Notes: ' + claim.Notes__c + '\n' +
-                              'Payment Status: ' + claim.Payment_Status__c + '\n' +
-                              'Provider: ' + claim.Provider__c + '\n' +
-                              'Provider Id: ' + claim.Provider_Id__c + '\n' +
-                              'Provider NPI: ' + claim.Provider_NPI__c + '\n' +
-                              'Provider Type: ' + claim.Provider_Type__c + '\n' +
-                              'Service Description: ' + claim.Service_Description__c + '\n' +
-                              'Status Reason: ' + claim.Status_Reason__c + '\n' +
-                              'Submitted On: ' + claim.SubmittedOn__c + '\n' +
-                              'Total Applied to Deductible: ' + claim.Total_Applied_to_Deductible__c + '\n' +
-                              'Total Eligible: ' + claim.Total_Eligible__c + '\n' +
-                              'User Question: ' + claim.ChatGPT_Question__c;
+            accountIds.add(claim.Account__c);
+        }
+    }
 
-            // Call the APICallClass to send the question to GPT
-            APICallClass.sendToGPT(claim.Id, question);
+    // Fetch the relevant Account records
+    Map<Id, Account> accountMap = new Map<Id, Account>(
+        [SELECT Id, 
+            PXPAYER_Specialty__pc, Name, FirstName, LastName, OwnerId, 
+            RecordTypeId, AccountNumber, BillingAddress, 
+            PXPAY_Primary_Care_Coordinator__c, PXPAY_Primary_Caregiver__c, 
+            HealthCloudGA__PrimaryContact__c, Phone, PersonEmail, 
+            HealthCloudGA__Gender__pc, PersonBirthdate, PXPAYER_Member_ID__c, 
+            Site, HealthCloudGA__CarePlan__c, Coverage_Benefit__c, 
+            HealthCloudGA__MedicareEnrollee__c, Member_Plan__c, 
+            PXPAYER_Satisfaction__pc, PXPAY_Risk_Level__c, PersonPronouns, 
+            HealthCloudGA__PrimaryLanguage__pc
+         FROM Account 
+         WHERE Id IN :accountIds]);
 
-            // Set a temporary response to indicate that the question has been sent
-            claim.ChatGPT_Response__c = 'Question sent to GPT at ' + Datetime.now().format('yyyy-MM-dd HH:mm:ss') + 
-                                        '. The response will be updated shortly.';
+    // Fetch all related claims for the accounts involved
+    Map<Id, List<Claim_Header__c>> claimsByAccountMap = new Map<Id, List<Claim_Header__c>>();
+    for (Claim_Header__c relatedClaim : [SELECT Id, Account__c, AdjudicatedAmount__c, Adjustment_Number__c, 
+                                         Check_Number__c, ClaimAmount__c, Name, ClaimStatus__c, 
+                                         Coinsurance_out_of_Network__c, Coinsurnace_In_Network__c, 
+                                         CreatedById, Disposition_Date__c, ClaimNumber__c, ExternalId__c, 
+                                         Fill_Date__c, LastModifiedById, Medicare__c, Notes__c, 
+                                         OwnerId, Payment_Status__c, Provider__c, Provider_Id__c, 
+                                         Provider_NPI__c, Provider_Type__c, Service_Description__c, 
+                                         Status_Reason__c, SubmittedOn__c, Total_Applied_to_Deductible__c, 
+                                         Total_Eligible__c, Total_Paid__c, ChatGPT_Question__c, ChatGPT_Response__c 
+                                         FROM Claim_Header__c 
+                                         WHERE Account__c IN :accountIds]) {
+        if (!claimsByAccountMap.containsKey(relatedClaim.Account__c)) {
+            claimsByAccountMap.put(relatedClaim.Account__c, new List<Claim_Header__c>());
+        }
+        claimsByAccountMap.get(relatedClaim.Account__c).add(relatedClaim);
+    }
+
+    // Iterate over claims and collect necessary information for the question
+    for (Claim_Header__c claim : Trigger.new) {
+        Claim_Header__c oldClaim = Trigger.oldMap.get(claim.Id);
+        if (claim.ChatGPT_Question__c != oldClaim.ChatGPT_Question__c) {
+            Account account = accountMap.get(claim.Account__c);
+
+            // Prepare the question with all the data fields from Claim_Header__c and Account
+            String question =
+                'Question about the claim: ' + claim.ChatGPT_Question__c + '\n' +
+                'Account: ' + account.Name + '\n' +
+                'Specialty: ' + account.PXPAYER_Specialty__pc + '\n' +
+                'Account Name: ' + account.Name + '\n' +
+                'First Name: ' + account.FirstName + '\n' +
+                'Last Name: ' + account.LastName + '\n' +
+                'Account Owner: ' + account.OwnerId + '\n' +
+                'Account Record Type: ' + account.RecordTypeId + '\n' +
+                'Account Number: ' + account.AccountNumber + '\n' +
+                'Billing Address: ' + account.BillingAddress + '\n' +
+                'Primary Care Coordinator: ' + account.PXPAY_Primary_Care_Coordinator__c + '\n' +
+                'Primary Caregiver: ' + account.PXPAY_Primary_Caregiver__c + '\n' +
+                'Primary Contact: ' + account.HealthCloudGA__PrimaryContact__c + '\n' +
+                'Phone: ' + account.Phone + '\n' +
+                'Email: ' + account.PersonEmail + '\n' +
+                'Gender: ' + account.HealthCloudGA__Gender__pc + '\n' +
+                'Birthdate: ' + account.PersonBirthdate + '\n' +
+                'Member ID: ' + account.PXPAYER_Member_ID__c + '\n' +
+                'Account Site: ' + account.Site + '\n' +
+                'Care Plan: ' + account.HealthCloudGA__CarePlan__c + '\n' +
+                'Coverage Benefit: ' + account.Coverage_Benefit__c + '\n' +
+                'Medicare Enrollee: ' + account.HealthCloudGA__MedicareEnrollee__c + '\n' +
+                'Member Plan: ' + account.Member_Plan__c + '\n' +
+                'Satisfaction: ' + account.PXPAYER_Satisfaction__pc + '\n' +
+                'Risk Level: ' + account.PXPAY_Risk_Level__c + '\n' +
+                'Pronouns: ' + account.PersonPronouns + '\n' +
+                'Primary Language: ' + account.HealthCloudGA__PrimaryLanguage__pc + '\n\n' +
+                'Adjudicated Amount: ' + claim.AdjudicatedAmount__c + '\n' +
+                'Adjustment #: ' + claim.Adjustment_Number__c + '\n' +
+                'Check #: ' + claim.Check_Number__c + '\n' +
+                'Claim Amount: ' + claim.ClaimAmount__c + '\n' +
+                'Claim Number: ' + claim.Name + '\n' +
+                'Claim Status: ' + claim.ClaimStatus__c + '\n' +
+                'Coinsurance - out of Network: ' + claim.Coinsurance_out_of_Network__c + '\n' +
+                'Coinsurance - In Network: ' + claim.Coinsurnace_In_Network__c + '\n' +
+                'Created By: ' + claim.CreatedById + '\n' +
+                'Disposition Date: ' + claim.Disposition_Date__c + '\n' +
+                'External ID: ' + claim.ClaimNumber__c + '\n' +
+                'External Id: ' + claim.ExternalId__c + '\n' +
+                'Fill Date: ' + claim.Fill_Date__c + '\n' +
+                'Last Modified By: ' + claim.LastModifiedById + '\n' +
+                'Medicare: ' + claim.Medicare__c + '\n' +
+                'Notes: ' + claim.Notes__c + '\n' +
+                'Owner: ' + claim.OwnerId + '\n' +
+                'Payment Status: ' + claim.Payment_Status__c + '\n' +
+                'Provider: ' + claim.Provider__c + '\n' +
+                'Provider Id: ' + claim.Provider_Id__c + '\n' +
+                'Provider NPI: ' + claim.Provider_NPI__c + '\n' +
+                'Provider Type: ' + claim.Provider_Type__c + '\n' +
+                'Service Description: ' + claim.Service_Description__c + '\n' +
+                'Status Reason: ' + claim.Status_Reason__c + '\n' +
+                'Submitted On: ' + claim.SubmittedOn__c + '\n' +
+                'Total Applied to Deductible: ' + claim.Total_Applied_to_Deductible__c + '\n' +
+                'Total Eligible: ' + claim.Total_Eligible__c + '\n' +
+                'Total Paid: ' + claim.Total_Paid__c;
+
+            // Add related claim information
+            if (claimsByAccountMap.containsKey(claim.Account__c)) {
+                question += '\n\nRelated Claims:\n';
+                for (Claim_Header__c relatedClaim : claimsByAccountMap.get(claim.Account__c)) {
+                    if (relatedClaim.Id != claim.Id) {
+                        question +=
+                            'Adjudicated Amount: ' + relatedClaim.AdjudicatedAmount__c + '\n' +
+                            'Adjustment #: ' + relatedClaim.Adjustment_Number__c + '\n' +
+                            'Check #: ' + relatedClaim.Check_Number__c + '\n' +
+                            'Claim Amount: ' + relatedClaim.ClaimAmount__c + '\n' +
+                            'Claim Number: ' + relatedClaim.Name + '\n' +
+                            'Claim Status: ' + relatedClaim.ClaimStatus__c + '\n' +
+                            'Coinsurance - out of Network: ' + relatedClaim.Coinsurance_out_of_Network__c + '\n' +
+                            'Coinsurance - In Network: ' + relatedClaim.Coinsurnace_In_Network__c + '\n' +
+                            'Created By: ' + relatedClaim.CreatedById + '\n' +
+                            'Disposition Date: ' + relatedClaim.Disposition_Date__c + '\n' +
+                            'External ID: ' + relatedClaim.ClaimNumber__c + '\n' +
+                            'External Id: ' + relatedClaim.ExternalId__c + '\n' +
+                            'Fill Date: ' + relatedClaim.Fill_Date__c + '\n' +
+                            'Last Modified By: ' + relatedClaim.LastModifiedById + '\n' +
+                            'Medicare: ' + relatedClaim.Medicare__c + '\n' +
+                            'Notes: ' + relatedClaim.Notes__c + '\n' +
+                            'Owner: ' + relatedClaim.OwnerId + '\n' +
+                            'Payment Status: ' + relatedClaim.Payment_Status__c + '\n' +
+                            'Provider: ' + relatedClaim.Provider__c + '\n' +
+                            'Provider Id: ' + relatedClaim.Provider_Id__c + '\n' +
+                            'Provider NPI: ' + relatedClaim.Provider_NPI__c + '\n' +
+                            'Provider Type: ' + relatedClaim.Provider_Type__c + '\n' +
+                            'Service Description: ' + relatedClaim.Service_Description__c + '\n' +
+                            'Status Reason: ' + relatedClaim.Status_Reason__c + '\n' +
+                            'Submitted On: ' + relatedClaim.SubmittedOn__c + '\n' +
+                            'Total Applied to Deductible: ' + relatedClaim.Total_Applied_to_Deductible__c + '\n' +
+                            'Total Eligible: ' + relatedClaim.Total_Eligible__c + '\n' +
+                            'Total Paid: ' + relatedClaim.Total_Paid__c + '\n\n';
+                    }
+                }
+            }
+
+            // Call the APICallClass to send the question to the Claim Question API
+            APICallClass.sendToClaimQuestionAPI(claim.Id, question);
         }
     }
 }
