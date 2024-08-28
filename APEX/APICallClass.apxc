@@ -1,0 +1,45 @@
+public class APICallClass {
+    @future(callout=true)
+    public static void sendToClaimQuestionAPI(Id claimId, String question) {
+        // First, make the callout
+        String apiResponse = makeCallout(question);
+
+        // Then, update the Claim_Header__c record
+        updateClaimHeader(claimId, question, apiResponse);
+    }
+
+    private static String makeCallout(String question) {
+        // Prepare the HTTP request
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('https://claimquestion.replit.app/claim-question');
+        req.setMethod('POST');
+        req.setHeader('Content-Type', 'application/json');
+
+        // Prepare the request body
+        String body = JSON.serialize(new Map<String, String>{
+            'question' => question
+        });
+        req.setBody(body);
+
+        // Send the request
+        Http http = new Http();
+        HttpResponse res = http.send(req);
+
+        // Process the response
+        if (res.getStatusCode() == 200) {
+            Map<String, Object> responseBody = (Map<String, Object>)JSON.deserializeUntyped(res.getBody());
+            return (String)responseBody.get('answer');
+        } else {
+            System.debug('Error calling Claim Question API: ' + res.getStatusCode() + ' ' + res.getStatus());
+            return 'Error occurred while processing the question. Please try again later.';
+        }
+    }
+
+    private static void updateClaimHeader(Id claimId, String question, String apiResponse) {
+        Claim_Header__c claim = [SELECT Id, ChatGPT_Question__c, ChatGPT_Response__c FROM Claim_Header__c WHERE Id = :claimId];
+
+        claim.ChatGPT_Response__c = 'Question asked at ' + Datetime.now().format('yyyy-MM-dd HH:mm:ss') + ':\n\n' + 
+                                    question + '\n\nAPI Response:\n' + apiResponse;
+        update claim;
+    }
+}
