@@ -1,0 +1,49 @@
+trigger SendToGPT on Claim_Header__c (before update) {
+    for (Claim_Header__c claim : Trigger.new) {
+        // Get the old version of the record to compare with the new version
+        Claim_Header__c oldClaim = Trigger.oldMap.get(claim.Id);
+
+        // Check if the ChatGPT_Question__c field value has changed
+        if (oldClaim != null && claim.ChatGPT_Question__c != oldClaim.ChatGPT_Question__c) {
+            // Get the current timestamp
+            Datetime now = Datetime.now();
+
+            // Format the timestamp as a string
+            String formattedTimestamp = now.format('yyyy-MM-dd HH:mm:ss');
+
+            // Populate the ChatGPT_Response__c field with the question and timestamp
+            claim.ChatGPT_Response__c = 'Question asked at ' + formattedTimestamp + ':\n\n' + claim.ChatGPT_Question__c;
+
+            // Prepare the question field with the necessary data fields
+            String question = 'Account: ' + claim.Account__c + '\n' +
+                              'Adjudicated Amount: ' + claim.AdjudicatedAmount__c + '\n' +
+                              'Adjustment #: ' + claim.Adjustment_Number__c + '\n' +
+                              'Check #: ' + claim.Check_Number__c + '\n' +
+                              'Claim Amount: ' + claim.ClaimAmount__c + '\n' +
+                              'Claim Number: ' + claim.Name + '\n' +
+                              'Claim Status: ' + claim.ClaimStatus__c + '\n' +
+                              'Coinsurance - out of Network: ' + claim.Coinsurance_out_of_Network__c + '\n' +
+                              'Coinsurance - In Network: ' + claim.Coinsurnace_In_Network__c + '\n' +
+                              'Disposition Date: ' + claim.Disposition_Date__c + '\n' +
+                              'External ID: ' + claim.ClaimNumber__c + '\n' +
+                              'External Id: ' + claim.ExternalId__c + '\n' +
+                              'Fill Date: ' + claim.Fill_Date__c + '\n' +
+                              'Medicare: ' + claim.Medicare__c + '\n' +
+                              'Notes: ' + claim.Notes__c + '\n' +
+                              'Payment Status: ' + claim.Payment_Status__c + '\n' +
+                              'Provider: ' + claim.Provider__c + '\n' +
+                              'Provider Id: ' + claim.Provider_Id__c + '\n' +
+                              'Provider NPI: ' + claim.Provider_NPI__c + '\n' +
+                              'Provider Type: ' + claim.Provider_Type__c + '\n' +
+                              'Service Description: ' + claim.Service_Description__c + '\n' +
+                              'Status Reason: ' + claim.Status_Reason__c + '\n' +
+                              'Submitted On: ' + claim.SubmittedOn__c + '\n' +
+                              'Total Applied to Deductible: ' + claim.Total_Applied_to_Deductible__c + '\n' +
+                              'Total Eligible: ' + claim.Total_Eligible__c + '\n';
+
+            // Here you would typically send the question to GPT and get the response
+            // For now, we'll just add a placeholder for the GPT response
+            claim.ChatGPT_Response__c += '\n\nGPT Response:\n[Placeholder for GPT response]';
+        }
+    }
+}
